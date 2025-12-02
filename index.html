@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ប្រព័ន្ធវត្តមានបុគ្គលិក - Attendance App</title>
+    <title>ប្រព័ន្ធវត្តមានបុគ្គលិក - Attendance</title>
     
     <!-- Google Fonts: Kantumruy Pro -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -110,7 +110,6 @@
         const { useState, useEffect, useMemo, useCallback } = React;
 
         // --- Icons Components (Lucide Replicas) ---
-        // Memoized icons for performance
         const IconBase = React.memo(({ children, size = 24, className = "" }) => (
             <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
                 {children}
@@ -168,13 +167,16 @@
         const EmployeeCard = React.memo(({ emp, record, onCheckIn, onCheckOut }) => {
             const isCheckedIn = !!record;
             const isCheckedOut = record?.status === 'completed';
-            const isPermission = record?.status === 'permission';
+            
+            // Logic for displaying permission
+            const isPermissionIn = record?.checkInTime === "សុំច្បាប់";
+            const isPermissionOut = record?.checkOutTime === "សុំច្បាប់";
 
             return (
                 <div className="group bg-white p-4 rounded-2xl border border-slate-100/60 flex items-center justify-between shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05)] hover:shadow-lg hover:border-indigo-100 transition-all duration-200">
                     <div className="flex items-center gap-4">
                         <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-lg font-bold shadow-inner transition-colors duration-200 ${
-                            isPermission ? 'bg-orange-50 text-orange-600 ring-2 ring-orange-100' :
+                            (isPermissionIn || isPermissionOut) ? 'bg-orange-50 text-orange-600 ring-2 ring-orange-100' :
                             isCheckedIn ? 'bg-indigo-50 text-indigo-600 ring-2 ring-indigo-100' : 'bg-slate-50 text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-500'
                         }`}>
                             {emp.khmer_name ? emp.khmer_name[0] : <User />}
@@ -197,9 +199,9 @@
                                 )}
                             </div>
                             <div className="flex items-center gap-2">
-                                {isPermission ? (
+                                {isPermissionIn ? (
                                     <span className="inline-flex items-center gap-1 text-[10px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-md border border-orange-100">
-                                        <FileText size={10} /> សុំច្បាប់
+                                        <FileText size={10} /> ច្បាប់ចូល
                                     </span>
                                 ) : isCheckedIn ? (
                                     <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
@@ -220,10 +222,6 @@
                             >
                                 <UserCheck size={20} />
                             </button>
-                        ) : isPermission ? (
-                            <div className="w-10 h-10 flex items-center justify-center bg-orange-50 rounded-xl border border-orange-100">
-                                <div className="w-2.5 h-2.5 bg-orange-400 rounded-full animate-pulse"></div>
-                            </div>
                         ) : !isCheckedOut ? (
                             <button
                                 onClick={() => onCheckIn(emp)} 
@@ -243,19 +241,21 @@
 
         // 2. Report Card Component
         const ReportCard = React.memo(({ record, onDelete }) => {
-            const isPerm = record.status === 'permission';
             const isCompleted = record.status === 'completed';
+            
+            const isPermissionIn = record?.checkInTime === "សុំច្បាប់";
+            const isPermissionOut = record?.checkOutTime === "សុំច្បាប់";
 
             return (
                 <div className="bg-white rounded-2xl p-4 shadow-[0_2px_12px_-3px_rgba(0,0,0,0.05)] border border-slate-100 relative overflow-hidden">
                     <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${
-                        isPerm ? 'bg-orange-400' : isCompleted ? 'bg-slate-400' : 'bg-emerald-500'
+                        (isPermissionIn || isPermissionOut) ? 'bg-orange-400' : isCompleted ? 'bg-slate-400' : 'bg-emerald-500'
                     }`}></div>
 
                     <div className="flex justify-between items-start mb-4 pl-3">
                         <div className="flex items-center gap-3">
                             <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shadow-sm ${
-                                isPerm ? 'bg-orange-50 text-orange-600' :
+                                (isPermissionIn || isPermissionOut) ? 'bg-orange-50 text-orange-600' :
                                 isCompleted ? 'bg-slate-100 text-slate-500' : 
                                 'bg-indigo-50 text-indigo-600'
                             }`}>
@@ -278,11 +278,11 @@
                                 </div>
                                 
                                 <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold inline-block mt-1 ${
-                                    isPerm ? 'bg-orange-50 text-orange-500 border border-orange-100' :
+                                    (isPermissionIn || isPermissionOut) ? 'bg-orange-50 text-orange-500 border border-orange-100' :
                                     isCompleted ? 'bg-slate-100 text-slate-500 border border-slate-200' : 
                                     'bg-indigo-50 text-indigo-600 border border-indigo-100'
                                 }`}>
-                                    {isPerm ? 'ច្បាប់' : isCompleted ? 'ចេញរួច' : 'កំពុងធ្វើការ'}
+                                    {(isPermissionIn || isPermissionOut) ? 'ច្បាប់' : isCompleted ? 'ចេញរួច' : 'កំពុងធ្វើការ'}
                                 </span>
                             </div>
                         </div>
@@ -298,38 +298,55 @@
                     <div className="h-px w-full bg-slate-50 mb-3 ml-2"></div>
 
                     <div className="pl-3">
-                        {isPerm ? (
-                            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                                <p className="text-xs text-slate-500 italic flex items-start gap-1.5">
-                                    <FileText size={14} className="mt-0.5 flex-shrink-0 text-slate-400" /> 
-                                    <span className="font-medium">{record.reason}</span>
-                                </p>
-                            </div>
-                        ) : (
-                            <div className="flex items-center justify-between text-sm">
-                                <div className="flex flex-col">
-                                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">ម៉ោងចូល</span>
+                        <div className="flex items-center justify-between text-sm">
+                            <div className="flex flex-col">
+                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">ម៉ោងចូល</span>
+                                {isPermissionIn ? (
+                                    <span className="font-mono font-bold text-orange-500 bg-orange-50 px-2.5 py-1 rounded-lg border border-orange-100 text-xs">
+                                        សុំច្បាប់
+                                    </span>
+                                ) : (
                                     <span className="font-mono font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100 text-xs">
                                         {record.checkInTime}
                                     </span>
-                                </div>
-                                
-                                <div className="text-slate-200 px-4">
-                                    <ArrowRight size={16} />
-                                </div>
+                                )}
+                            </div>
+                            
+                            <div className="text-slate-200 px-4">
+                                <ArrowRight size={16} />
+                            </div>
 
-                                <div className="flex flex-col items-end">
-                                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">ម៉ោងចេញ</span>
-                                    {record.checkOutTime ? (
-                                        <span className="font-mono font-bold text-red-500 bg-red-50 px-2.5 py-1 rounded-lg border border-red-100 text-xs">
-                                            {record.checkOutTime}
-                                        </span>
-                                    ) : (
-                                        <span className="font-mono font-bold text-slate-300 bg-slate-50 px-2.5 py-1 rounded-lg text-xs">
-                                            --:-- --
-                                        </span>
-                                    )}
-                                </div>
+                            <div className="flex flex-col items-end">
+                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">ម៉ោងចេញ</span>
+                                {isPermissionOut ? (
+                                    <span className="font-mono font-bold text-orange-500 bg-orange-50 px-2.5 py-1 rounded-lg border border-orange-100 text-xs">
+                                        សុំច្បាប់
+                                    </span>
+                                ) : record.checkOutTime ? (
+                                    <span className="font-mono font-bold text-red-500 bg-red-50 px-2.5 py-1 rounded-lg border border-red-100 text-xs">
+                                        {record.checkOutTime}
+                                    </span>
+                                ) : (
+                                    <span className="font-mono font-bold text-slate-300 bg-slate-50 px-2.5 py-1 rounded-lg text-xs">
+                                        --:-- --
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                        
+                        {/* Display Reasons if any */}
+                        {(record.checkInReason || record.checkOutReason) && (
+                            <div className="mt-3 pt-2 border-t border-slate-50">
+                                {record.checkInReason && (
+                                    <p className="text-[10px] text-slate-500 italic flex items-start gap-1">
+                                        <span className="text-orange-400 font-bold">ចូល:</span> {record.checkInReason}
+                                    </p>
+                                )}
+                                {record.checkOutReason && (
+                                    <p className="text-[10px] text-slate-500 italic flex items-start gap-1 mt-1">
+                                        <span className="text-orange-400 font-bold">ចេញ:</span> {record.checkOutReason}
+                                    </p>
+                                )}
                             </div>
                         )}
                     </div>
@@ -468,23 +485,45 @@
                     return;
                 }
                 const now = new Date();
-                const recordData = {
-                    khmer_name: selectedEmp.khmer_name,
-                    checkInTime: "សុំច្បាប់",
-                    checkInTimestamp: now.toISOString(),
-                    status: 'permission',
-                    type: 'permission',
-                    reason: permissionReason,
-                    checkOutTime: "-",
-                    checkOutTimestamp: null
-                };
-                try {
-                    await set(ref(destDb, `attendance/${todayKey}/${selectedEmp.id}`), recordData);
-                    showNotification(`📝 បានកត់ត្រាច្បាប់: ${selectedEmp.khmer_name}`);
-                    closeActionModal();
-                } catch (error) {
-                    console.error(error);
-                    showNotification("បរាជ័យក្នុងការកត់ត្រា", "error");
+                
+                // Determine if we are updating Check In or Check Out based on existing record
+                const isAlreadyCheckedIn = todayAttendance[selectedEmp.id];
+
+                if (isAlreadyCheckedIn) {
+                    // CASE: Permission during Check Out
+                    try {
+                        await update(ref(destDb, `attendance/${todayKey}/${selectedEmp.id}`), {
+                            checkOutTime: "សុំច្បាប់",
+                            checkOutTimestamp: now.toISOString(),
+                            checkOutReason: permissionReason,
+                            status: 'completed'
+                        });
+                        showNotification(`📝 បានកត់ត្រាច្បាប់ចេញ: ${selectedEmp.khmer_name}`);
+                        closeActionModal();
+                    } catch (error) {
+                        console.error(error);
+                        showNotification("បរាជ័យក្នុងការកត់ត្រា", "error");
+                    }
+                } else {
+                    // CASE: Permission during Check In
+                    const recordData = {
+                        khmer_name: selectedEmp.khmer_name,
+                        checkInTime: "សុំច្បាប់",
+                        checkInTimestamp: now.toISOString(),
+                        checkInReason: permissionReason,
+                        status: 'present', // IMPORTANT: Allow Check Out later
+                        type: 'permission',
+                        checkOutTime: null,
+                        checkOutTimestamp: null
+                    };
+                    try {
+                        await set(ref(destDb, `attendance/${todayKey}/${selectedEmp.id}`), recordData);
+                        showNotification(`📝 បានកត់ត្រាច្បាប់ចូល: ${selectedEmp.khmer_name}`);
+                        closeActionModal();
+                    } catch (error) {
+                        console.error(error);
+                        showNotification("បរាជ័យក្នុងការកត់ត្រា", "error");
+                    }
                 }
             };
 
@@ -514,10 +553,17 @@
 
             const stats = useMemo(() => {
                 const records = Object.values(todayAttendance);
+                // Simple logic for stats - customize as needed
+                const present = records.filter(r => r.status === 'present').length;
+                const completed = records.filter(r => r.status === 'completed').length;
+                // Permission can be tricky if it's mixed status, let's just count total records
+                // Or count permissions specifically
+                const perms = records.filter(r => r.checkInTime === "សុំច្បាប់" || r.checkOutTime === "សុំច្បាប់").length;
+                
                 return {
-                    present: records.filter(r => r.status === 'present').length,
-                    permission: records.filter(r => r.status === 'permission').length,
-                    completed: records.filter(r => r.status === 'completed').length,
+                    present: present,
+                    permission: perms, 
+                    completed: completed,
                     absent: employees.length - records.length
                 };
             }, [todayAttendance, employees.length]);
@@ -657,7 +703,7 @@
                                                 <p className="text-indigo-100 text-xs mt-1 opacity-90">{new Date().toLocaleDateString('km-KH')}</p>
                                             </div>
                                             <div className="bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold border border-white/20">
-                                                {stats.present + stats.completed + stats.permission} នាក់
+                                                {stats.present + stats.completed} នាក់
                                             </div>
                                         </div>
                                         
