@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ប្រព័ន្ធវត្តមានបុគ្គលិក - Attendance App</title>
+    
+    <!-- Google Fonts: Kantumruy Pro -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Kantumruy Pro', sans-serif !important;
+            background-color: #F8FAFC;
+        }
+
+        /* Animations */
+        @keyframes float {
+            0% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-20px) rotate(10deg); }
+            100% { transform: translateY(0px) rotate(0deg); }
+        }
+        @keyframes float-delayed {
+            0% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(20px) rotate(-10deg); }
+            100% { transform: translateY(0px) rotate(0deg); }
+        }
+        @keyframes shimmer {
+            0% { background-position: -1000px 0; }
+            100% { background-position: 1000px 0; }
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes zoomIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes bounceIn {
+            0% { transform: scale(0.3); opacity: 0; }
+            50% { transform: scale(1.05); opacity: 1; }
+            70% { transform: scale(0.9); }
+            100% { transform: scale(1); }
+        }
+
+        .animate-float { animation: float 6s ease-in-out infinite; }
+        .animate-float-delayed { animation: float-delayed 8s ease-in-out infinite; }
+        .animate-slide-up { animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .animate-zoom-in { animation: zoomIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        .animate-bounce-in { animation: bounceIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        
+        .glass-header {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.6);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05);
+        }
+        .bg-gradient-brand {
+            background: linear-gradient(135deg, #6366F1 0%, #3B82F6 100%);
+        }
+        .text-gradient {
+            background: linear-gradient(135deg, #6366F1 0%, #3B82F6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .skeleton-loading {
+            animation: shimmer 2s infinite linear;
+            background: linear-gradient(to right, #f1f5f9 4%, #e2e8f0 25%, #f1f5f9 36%);
+            background-size: 1000px 100%;
+        }
+
+        /* Scrollbar hidden */
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+        import { getDatabase, ref, onValue, set, update, remove } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+        const { useState, useEffect } = React;
+
+        // --- Icons Components (Lucide Replicas) ---
+        const IconBase = ({ children, size = 24, className = "" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                {children}
+            </svg>
+        );
+
+        const UserCheck = (props) => <IconBase {...props}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/></IconBase>;
+        const Search = (props) => <IconBase {...props}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></IconBase>;
+        const CheckCircle = (props) => <IconBase {...props}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></IconBase>;
+        const Clock = (props) => <IconBase {...props}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></IconBase>;
+        const LogOut = (props) => <IconBase {...props}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></IconBase>;
+        const BarChart3 = (props) => <IconBase {...props}><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></IconBase>;
+        const Calendar = (props) => <IconBase {...props}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></IconBase>;
+        const FileText = (props) => <IconBase {...props}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></IconBase>;
+        const X = (props) => <IconBase {...props}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></IconBase>;
+        const Home = (props) => <IconBase {...props}><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></IconBase>;
+        const Send = (props) => <IconBase {...props}><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></IconBase>;
+        const User = (props) => <IconBase {...props}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></IconBase>;
+        const Download = (props) => <IconBase {...props}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></IconBase>;
+        const Trash2 = (props) => <IconBase {...props}><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></IconBase>;
+        const AlertTriangle = (props) => <IconBase {...props}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></IconBase>;
+        const ArrowRight = (props) => <IconBase {...props}><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></IconBase>;
+
+        // --- Configuration ---
+        const sourceConfig = {
+            apiKey: "AIzaSyCSCL7yNCMAuoqliqmDq24FrrfkvAxLBz4",
+            authDomain: "itinfo-8501a.firebaseapp.com",
+            databaseURL: "https://itinfo-8501a-default-rtdb.firebaseio.com",
+            projectId: "itinfo-8501a",
+            storageBucket: "itinfo-8501a.firebasestorage.app",
+            messagingSenderId: "829674637790",
+            appId: "1:829674637790:web:0ae1c4cd27b1e35a14f54f",
+            measurementId: "G-VYXZXBHWFT"
+        };
+
+        const destConfig = {
+            apiKey: "AIzaSyC3pJ5902riWQ_5tSNi2MxznKj3msUtXMg",
+            authDomain: "att-e7aba.firebaseapp.com",
+            databaseURL: "https://att-e7aba-default-rtdb.firebaseio.com",
+            projectId: "att-e7aba",
+            storageBucket: "att-e7aba.firebasestorage.app",
+            messagingSenderId: "893825794222",
+            appId: "1:893825794222:web:3e373a1801af855aecad3f",
+            measurementId: "G-0SXDQ6SQMK"
+        };
+
+        const sourceApp = initializeApp(sourceConfig, "sourceApp");
+        const destApp = initializeApp(destConfig, "destApp");
+        const sourceDb = getDatabase(sourceApp);
+        const destDb = getDatabase(destApp);
+
+        // --- Skeleton Component ---
+        const SkeletonCard = () => (
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3 w-full">
+                    <div className="w-12 h-12 rounded-full skeleton-loading flex-shrink-0"></div>
+                    <div className="flex-1 space-y-2">
+                        <div className="h-4 w-32 rounded skeleton-loading"></div>
+                        <div className="h-3 w-20 rounded skeleton-loading"></div>
+                    </div>
+                </div>
+                <div className="w-10 h-10 rounded-lg skeleton-loading flex-shrink-0"></div>
+            </div>
+        );
+
+        function App() {
+            const [activeTab, setActiveTab] = useState('attendance');
+            const [employees, setEmployees] = useState([]);
+            const [todayAttendance, setTodayAttendance] = useState({});
+            const [loading, setLoading] = useState(true);
+            const [searchTerm, setSearchTerm] = useState('');
+            const [notification, setNotification] = useState(null);
+            
+            // Modal States
+            const [selectedEmp, setSelectedEmp] = useState(null);
+            const [showActionModal, setShowActionModal] = useState(false);
+            const [deleteTarget, setDeleteTarget] = useState(null);
+            const [checkOutTarget, setCheckOutTarget] = useState(null);
+            const [permissionReason, setPermissionReason] = useState('');
+            const [isPermissionMode, setIsPermissionMode] = useState(false);
+            
+            const todayKey = new Date().toISOString().split('T')[0];
+
+            useEffect(() => {
+                const usersRef = ref(sourceDb, 'users');
+                const unsubscribe = onValue(usersRef, (snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        const loadedEmployees = Object.keys(data).map(userIdKey => {
+                            const userData = data[userIdKey]; 
+                            return {
+                                id: userIdKey, 
+                                khmer_name: userData.khmer_name || userData.first_name || "គ្មានឈ្មោះ",
+                                telegram: userData.link || ""
+                            };
+                        });
+                        loadedEmployees.sort((a, b) => a.khmer_name.localeCompare(b.khmer_name));
+                        setEmployees(loadedEmployees);
+                    }
+                    setLoading(false);
+                });
+                return () => unsubscribe();
+            }, []);
+
+            useEffect(() => {
+                const attendanceRef = ref(destDb, `attendance/${todayKey}`);
+                const unsubscribe = onValue(attendanceRef, (snapshot) => {
+                    const data = snapshot.val() || {};
+                    setTodayAttendance(data);
+                });
+                return () => unsubscribe();
+            }, [todayKey]);
+
+            const showNotification = (message, type = 'success') => {
+                setNotification({ message, type });
+                setTimeout(() => setNotification(null), 3000);
+            };
+
+            const openActionModal = (emp) => {
+                setSelectedEmp(emp);
+                setIsPermissionMode(false);
+                setPermissionReason('');
+                setShowActionModal(true);
+            };
+
+            const closeActionModal = () => {
+                setShowActionModal(false);
+                setSelectedEmp(null);
+            };
+
+            const initiateCheckOut = (empId, empName) => {
+                setCheckOutTarget({ id: empId, name: empName });
+            };
+
+            const confirmCheckOut = async () => {
+                if (!checkOutTarget) return;
+                const now = new Date();
+                const timeString = now.toLocaleTimeString('km-KH', { hour: '2-digit', minute: '2-digit' });
+                try {
+                    await update(ref(destDb, `attendance/${todayKey}/${checkOutTarget.id}`), {
+                        checkOutTime: timeString,
+                        checkOutTimestamp: now.toISOString(),
+                        status: 'completed'
+                    });
+                    showNotification(`👋 Check-out ជោគជ័យ: ${checkOutTarget.name}`);
+                    setCheckOutTarget(null);
+                } catch (error) {
+                    console.error(error);
+                    showNotification("បរាជ័យក្នុងការ Check-out", "error");
+                }
+            };
+
+            const handleCheckIn = async () => {
+                if (!selectedEmp) return;
+                const now = new Date();
+                const timeString = now.toLocaleTimeString('km-KH', { hour: '2-digit', minute: '2-digit' });
+                const recordData = {
+                    khmer_name: selectedEmp.khmer_name,
+                    checkInTime: timeString,
+                    checkInTimestamp: now.toISOString(),
+                    status: 'present',
+                    type: 'work',
+                    checkOutTime: null,
+                    checkOutTimestamp: null
+                };
+                try {
+                    await set(ref(destDb, `attendance/${todayKey}/${selectedEmp.id}`), recordData);
+                    showNotification(`✅ Check-in ជោគជ័យ: ${selectedEmp.khmer_name}`);
+                    closeActionModal();
+                } catch (error) {
+                    console.error(error);
+                    showNotification("បរាជ័យក្នុងការ Check-in", "error");
+                }
+            };
+
+            const handlePermission = async () => {
+                if (!selectedEmp) return;
+                if (!permissionReason.trim()) {
+                    showNotification("សូមសរសេរមូលហេតុ!", "error");
+                    return;
+                }
+                const now = new Date();
+                const recordData = {
+                    khmer_name: selectedEmp.khmer_name,
+                    checkInTime: "សុំច្បាប់",
+                    checkInTimestamp: now.toISOString(),
+                    status: 'permission',
+                    type: 'permission',
+                    reason: permissionReason,
+                    checkOutTime: "-",
+                    checkOutTimestamp: null
+                };
+                try {
+                    await set(ref(destDb, `attendance/${todayKey}/${selectedEmp.id}`), recordData);
+                    showNotification(`📝 បានកត់ត្រាច្បាប់: ${selectedEmp.khmer_name}`);
+                    closeActionModal();
+                } catch (error) {
+                    console.error(error);
+                    showNotification("បរាជ័យក្នុងការកត់ត្រា", "error");
+                }
+            };
+
+            const initiateDelete = (empId, empName) => {
+                setDeleteTarget({ id: empId, name: empName });
+            };
+
+            const confirmDelete = async () => {
+                if (!deleteTarget) return;
+                try {
+                    await remove(ref(destDb, `attendance/${todayKey}/${deleteTarget.id}`));
+                    showNotification(`🗑️ បានលុបវត្តមាន: ${deleteTarget.name}`, "success");
+                    setDeleteTarget(null);
+                } catch (error) {
+                    console.error("Delete error:", error);
+                    showNotification("បរាជ័យក្នុងការលុប", "error");
+                }
+            };
+
+            const filteredEmployees = employees.filter(emp => {
+                const searchLower = searchTerm.toLowerCase();
+                const kName = emp.khmer_name?.toLowerCase() || '';
+                return kName.includes(searchLower);
+            });
+
+            const stats = {
+                present: Object.values(todayAttendance).filter(r => r.status === 'present').length,
+                permission: Object.values(todayAttendance).filter(r => r.status === 'permission').length,
+                completed: Object.values(todayAttendance).filter(r => r.status === 'completed').length,
+                absent: employees.length - Object.keys(todayAttendance).length
+            };
+
+            const reportList = Object.keys(todayAttendance).map(key => {
+                const empInfo = employees.find(e => e.id === key);
+                return {
+                    id: key,
+                    ...todayAttendance[key],
+                    telegram: empInfo ? empInfo.telegram : ""
+                };
+            }).sort((a, b) => {
+                if (a.checkInTimestamp && b.checkInTimestamp) {
+                    return a.checkInTimestamp.localeCompare(b.checkInTimestamp);
+                }
+                return 0;
+            });
+
+            const isAlreadyCheckedIn = selectedEmp && todayAttendance[selectedEmp.id];
+
+            return (
+                <div className="min-h-screen bg-slate-50 text-slate-800 pb-32 relative overflow-hidden font-sans selection:bg-indigo-100 selection:text-indigo-600">
+                    
+                    {/* Dynamic Background Elements */}
+                    <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+                        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[40%] bg-indigo-200/30 rounded-full blur-[80px] animate-float"></div>
+                        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[40%] bg-blue-200/30 rounded-full blur-[80px] animate-float-delayed"></div>
+                    </div>
+                    
+                    {/* Header */}
+                    <div className="sticky top-0 z-30 glass-header transition-all duration-300">
+                        <div className="max-w-md mx-auto px-5 py-4 flex justify-between items-center">
+                            <div className="flex flex-col">
+                                <h1 className="text-2xl font-black tracking-tight text-slate-800 flex items-center gap-2">
+                                    <span className="text-gradient">វត្តមាន</span> App
+                                </h1>
+                                <p className="text-xs font-medium text-slate-500 flex items-center gap-1">
+                                    <Calendar size={12} className="text-indigo-500" />
+                                    {new Date().toLocaleDateString('km-KH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                                </p>
+                            </div>
+                            <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-indigo-600 shadow-lg shadow-indigo-100 border border-indigo-50">
+                                <UserCheck size={20} />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="max-w-md mx-auto px-4 py-6 relative z-10">
+                        
+                        {/* Modern Notification Toast */}
+                        {notification && (
+                            <div className={`fixed top-24 left-1/2 transform -translate-x-1/2 px-6 py-4 rounded-2xl shadow-2xl z-[60] flex items-center gap-3 animate-bounce-in glass-card border-0 backdrop-blur-xl ${
+                                notification.type === 'error' ? 'bg-red-50/90 text-red-600' : 'bg-emerald-50/90 text-emerald-600'
+                            }`}>
+                                <div className={`p-2 rounded-full ${notification.type === 'error' ? 'bg-red-100' : 'bg-emerald-100'}`}>
+                                    {notification.type === 'error' ? <X size={20} /> : <CheckCircle size={20} />}
+                                </div>
+                                <span className="font-bold text-sm">{notification.message}</span>
+                            </div>
+                        )}
+
+                        {/* --- Content: Attendance --- */}
+                        {activeTab === 'attendance' && (
+                            <div className="space-y-6 animate-fade-in">
+                                
+                                {/* Search Bar - Modern & Clean */}
+                                <div className="relative group mx-1">
+                                    <div className="absolute -inset-0.5 bg-gradient-brand rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-300"></div>
+                                    <div className="relative bg-white rounded-2xl shadow-sm flex items-center p-1.5 transition-all">
+                                        <Search className="ml-3 text-indigo-400 group-focus-within:text-indigo-600 transition-colors" size={20} />
+                                        <input
+                                            type="text"
+                                            placeholder="ស្វែងរកឈ្មោះបុគ្គលិក..."
+                                            className="w-full pl-3 pr-4 py-2.5 rounded-xl bg-transparent border-none focus:ring-0 text-slate-700 placeholder:text-slate-400 font-medium outline-none"
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* List Header */}
+                                <div className="flex items-center justify-between px-1">
+                                    <h3 className="text-base font-bold text-slate-700 flex items-center gap-2">
+                                        <span className="w-1.5 h-6 bg-indigo-500 rounded-full"></span>
+                                        បញ្ជីឈ្មោះ
+                                    </h3>
+                                    <span className="text-[10px] font-bold bg-white border border-slate-100 px-3 py-1 rounded-full text-slate-500 shadow-sm">
+                                        សរុប: {filteredEmployees.length}
+                                    </span>
+                                </div>
+
+                                {/* Employee List */}
+                                {loading ? (
+                                    <div className="space-y-3 mt-4">
+                                        {[1, 2, 3, 4, 5].map((i) => <SkeletonCard key={i} />)}
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3 pb-4">
+                                        {filteredEmployees.length === 0 ? (
+                                            <div className="text-center py-16 flex flex-col items-center justify-center">
+                                                <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                                                    <Search size={40} className="text-slate-300" />
+                                                </div>
+                                                <p className="text-slate-500 font-medium">រកមិនឃើញឈ្មោះនេះទេ</p>
+                                            </div>
+                                        ) : (
+                                            filteredEmployees.map((emp, index) => {
+                                                const record = todayAttendance[emp.id];
+                                                const isCheckedIn = !!record;
+                                                const isCheckedOut = record?.status === 'completed';
+                                                const isPermission = record?.status === 'permission';
+
+                                                return (
+                                                    <div 
+                                                        key={emp.id} 
+                                                        className="group bg-white p-4 rounded-2xl border border-slate-100/50 flex items-center justify-between shadow-[0_2px_10px_-4px_rgba(0,0,0,0.05)] hover:shadow-lg hover:-translate-y-1 hover:border-indigo-100 transition-all duration-300 animate-slide-up"
+                                                        style={{ animationDelay: `${index * 50}ms` }}
+                                                    >
+                                                        <div className="flex items-center gap-4">
+                                                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-lg font-bold shadow-inner transition-all duration-300 ${
+                                                                isPermission ? 'bg-orange-50 text-orange-600 ring-2 ring-orange-100' :
+                                                                isCheckedIn ? 'bg-indigo-50 text-indigo-600 ring-2 ring-indigo-100' : 'bg-slate-50 text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-500'
+                                                            }`}>
+                                                                {emp.khmer_name ? emp.khmer_name[0] : <User />}
+                                                            </div>
+                                                            <div>
+                                                                <div className="flex items-center gap-2 mb-1">
+                                                                    <h3 className="font-bold text-slate-800 text-sm group-hover:text-indigo-600 transition-colors">
+                                                                        {emp.khmer_name}
+                                                                    </h3>
+                                                                    {/* Telegram Link Icon */}
+                                                                    {emp.telegram && (
+                                                                        <a 
+                                                                            href={emp.telegram} 
+                                                                            target="_blank" 
+                                                                            rel="noopener noreferrer"
+                                                                            className="w-5 h-5 rounded-full bg-blue-50 flex items-center justify-center text-blue-500 hover:bg-blue-500 hover:text-white transition-all transform hover:scale-110"
+                                                                            onClick={(e) => e.stopPropagation()}
+                                                                        >
+                                                                            <Send size={10} className="-rotate-45 mr-0.5 mt-0.5" />
+                                                                        </a>
+                                                                    )}
+                                                                </div>
+                                                                <div className="flex items-center gap-2">
+                                                                    {isPermission ? (
+                                                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-md border border-orange-100">
+                                                                            <FileText size={10} /> សុំច្បាប់
+                                                                        </span>
+                                                                    ) : isCheckedIn ? (
+                                                                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
+                                                                            <Clock size={10} /> {record.checkInTime}
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="text-[10px] text-slate-400 font-medium bg-slate-50 px-2 py-0.5 rounded-md">មិនទាន់ចូល</span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="relative z-10">
+                                                            {!isCheckedIn ? (
+                                                                <button
+                                                                    onClick={() => openActionModal(emp)}
+                                                                    className="bg-indigo-600 hover:bg-indigo-700 text-white w-10 h-10 rounded-xl shadow-lg shadow-indigo-200 active:scale-90 transition-all flex items-center justify-center"
+                                                                >
+                                                                    <UserCheck size={20} />
+                                                                </button>
+                                                            ) : isPermission ? (
+                                                                <div className="w-10 h-10 flex items-center justify-center bg-orange-50 rounded-xl border border-orange-100">
+                                                                    <div className="w-2.5 h-2.5 bg-orange-400 rounded-full animate-pulse"></div>
+                                                                </div>
+                                                            ) : !isCheckedOut ? (
+                                                                <button
+                                                                    onClick={() => openActionModal(emp)} 
+                                                                    className="bg-white hover:bg-red-50 text-red-500 border border-red-100 w-10 h-10 rounded-xl active:scale-90 transition-all flex items-center justify-center shadow-sm"
+                                                                >
+                                                                    <LogOut size={20} />
+                                                                </button>
+                                                            ) : (
+                                                                <div className="w-10 h-10 flex items-center justify-center bg-emerald-50 rounded-xl border border-emerald-100 text-emerald-500">
+                                                                    <CheckCircle size={20} />
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* --- Content: Report --- */}
+                        {activeTab === 'report' && (
+                            <div className="space-y-6 animate-slide-up">
+                                {/* Summary Card - Glass Effect */}
+                                <div className="relative overflow-hidden bg-gradient-brand rounded-[28px] p-6 text-white shadow-xl shadow-indigo-500/20">
+                                    <div className="absolute top-0 right-0 p-4 opacity-10 rotate-12 transform scale-150">
+                                        <BarChart3 size={120} />
+                                    </div>
+                                    
+                                    <div className="relative z-10">
+                                        <div className="flex items-center justify-between mb-6">
+                                            <div>
+                                                <h2 className="font-bold text-lg leading-tight">របាយការណ៍ថ្ងៃនេះ</h2>
+                                                <p className="text-indigo-100 text-xs mt-1 opacity-90">{new Date().toLocaleDateString('km-KH')}</p>
+                                            </div>
+                                            <div className="bg-white/20 backdrop-blur-md px-3 py-1.5 rounded-full text-xs font-bold border border-white/20">
+                                                {stats.present + stats.completed + stats.permission} នាក់
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="flex justify-between gap-2">
+                                            <div className="flex-1 bg-white/10 backdrop-blur-md rounded-2xl p-3 text-center border border-white/10">
+                                                <div className="text-2xl font-black">{stats.present + stats.completed}</div>
+                                                <div className="text-[10px] uppercase tracking-wider opacity-80 mt-1">វត្តមាន</div>
+                                            </div>
+                                            <div className="flex-1 bg-white/10 backdrop-blur-md rounded-2xl p-3 text-center border border-white/10">
+                                                <div className="text-2xl font-black text-orange-200">{stats.permission}</div>
+                                                <div className="text-[10px] uppercase tracking-wider opacity-80 mt-1">ច្បាប់</div>
+                                            </div>
+                                            <div className="flex-1 bg-white/10 backdrop-blur-md rounded-2xl p-3 text-center border border-white/10">
+                                                <div className="text-2xl font-black text-red-200">{stats.absent}</div>
+                                                <div className="text-[10px] uppercase tracking-wider opacity-80 mt-1">អវត្តមាន</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Report Cards List */}
+                                <div className="space-y-4 pb-24">
+                                    <div className="flex items-center justify-between px-1">
+                                        <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                                            <span className="w-1.5 h-4 bg-indigo-500 rounded-full"></span>
+                                            លម្អិត ({reportList.length})
+                                        </h3>
+                                        <button className="text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors">
+                                            <Download size={14} /> Export
+                                        </button>
+                                    </div>
+
+                                    {reportList.length === 0 ? (
+                                        <div className="text-center py-12 bg-white/50 rounded-3xl border border-dashed border-slate-200">
+                                            <p className="text-slate-400 text-sm">មិនទាន់មានទិន្នន័យ</p>
+                                        </div>
+                                    ) : (
+                                        reportList.map((record, idx) => {
+                                            const isPerm = record.status === 'permission';
+                                            const isCompleted = record.status === 'completed';
+
+                                            return (
+                                                <div 
+                                                    key={record.id} 
+                                                    className="bg-white rounded-2xl p-4 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.05)] border border-slate-100 relative overflow-hidden animate-slide-up"
+                                                    style={{ animationDelay: `${idx * 50}ms` }}
+                                                >
+                                                    {/* Left Color Indicator */}
+                                                    <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${
+                                                        isPerm ? 'bg-orange-400' : isCompleted ? 'bg-slate-400' : 'bg-emerald-500'
+                                                    }`}></div>
+
+                                                    {/* Top Row: Name and Delete */}
+                                                    <div className="flex justify-between items-start mb-4 pl-3">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shadow-sm ${
+                                                                isPerm ? 'bg-orange-50 text-orange-600' :
+                                                                isCompleted ? 'bg-slate-100 text-slate-500' : 
+                                                                'bg-indigo-50 text-indigo-600'
+                                                            }`}>
+                                                                {record.khmer_name[0]}
+                                                            </div>
+                                                            <div>
+                                                                <div className="flex items-center gap-2">
+                                                                    <h4 className="font-bold text-slate-800 text-sm">{record.khmer_name}</h4>
+                                                                    {record.telegram && (
+                                                                        <a 
+                                                                            href={record.telegram} 
+                                                                            target="_blank" 
+                                                                            rel="noopener noreferrer"
+                                                                            className="w-6 h-6 rounded-full bg-[#229ED9] flex items-center justify-center text-white shadow-md shadow-blue-200 hover:shadow-blue-300 hover:scale-110 transition-all"
+                                                                            title="ផ្ញើសារ Telegram"
+                                                                        >
+                                                                            <Send size={12} className="-rotate-45 mr-0.5 mt-0.5" fill="white" />
+                                                                        </a>
+                                                                    )}
+                                                                </div>
+                                                                
+                                                                <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold inline-block mt-1 ${
+                                                                    isPerm ? 'bg-orange-50 text-orange-500 border border-orange-100' :
+                                                                    isCompleted ? 'bg-slate-100 text-slate-500 border border-slate-200' : 
+                                                                    'bg-indigo-50 text-indigo-600 border border-indigo-100'
+                                                                }`}>
+                                                                    {isPerm ? 'ច្បាប់' : isCompleted ? 'ចេញរួច' : 'កំពុងធ្វើការ'}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <button 
+                                                            onClick={() => initiateDelete(record.id, record.khmer_name)}
+                                                            className="text-slate-300 p-2 hover:bg-red-50 hover:text-red-500 rounded-xl transition-all"
+                                                        >
+                                                            <Trash2 size={18} />
+                                                        </button>
+                                                    </div>
+
+                                                    <div className="h-px w-full bg-slate-50 mb-3 ml-2"></div>
+
+                                                    {/* Bottom Row: Time Details */}
+                                                    <div className="pl-3">
+                                                        {isPerm ? (
+                                                            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                                                                <p className="text-xs text-slate-500 italic flex items-start gap-1.5">
+                                                                    <FileText size={14} className="mt-0.5 flex-shrink-0 text-slate-400" /> 
+                                                                    <span className="font-medium">{record.reason}</span>
+                                                                </p>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex items-center justify-between text-sm">
+                                                                <div className="flex flex-col">
+                                                                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">ម៉ោងចូល</span>
+                                                                    <span className="font-mono font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100 text-xs">
+                                                                        {record.checkInTime}
+                                                                    </span>
+                                                                </div>
+                                                                
+                                                                <div className="text-slate-200 px-4">
+                                                                    <ArrowRight size={16} />
+                                                                </div>
+
+                                                                <div className="flex flex-col items-end">
+                                                                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">ម៉ោងចេញ</span>
+                                                                    {record.checkOutTime ? (
+                                                                        <span className="font-mono font-bold text-red-500 bg-red-50 px-2.5 py-1 rounded-lg border border-red-100 text-xs">
+                                                                            {record.checkOutTime}
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="font-mono font-bold text-slate-300 bg-slate-50 px-2.5 py-1 rounded-lg text-xs">
+                                                                            --:-- --
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Modern Floating Bottom Navigation */}
+                    <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 w-[90%] max-w-[320px] z-40">
+                        <div className="glass-header rounded-full p-1.5 shadow-2xl shadow-indigo-900/10 flex justify-between items-center relative border border-white/50 backdrop-blur-xl">
+                            
+                            <div 
+                                className={`absolute top-1.5 bottom-1.5 w-[48%] bg-slate-800 rounded-full transition-all duration-300 ease-spring shadow-lg ${
+                                    activeTab === 'attendance' ? 'left-1.5' : 'left-[50%]'
+                                }`}
+                            ></div>
+
+                            <button 
+                                onClick={() => setActiveTab('attendance')}
+                                className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-full relative z-10 transition-colors duration-300 ${
+                                    activeTab === 'attendance' ? 'text-white' : 'text-slate-400 hover:text-slate-600'
+                                }`}
+                            >
+                                <Home size={20} strokeWidth={activeTab === 'attendance' ? 2.5 : 2} />
+                                <span className="text-xs font-bold">វត្តមាន</span>
+                            </button>
+                            
+                            <button 
+                                onClick={() => setActiveTab('report')}
+                                className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-full relative z-10 transition-colors duration-300 ${
+                                    activeTab === 'report' ? 'text-white' : 'text-slate-400 hover:text-slate-600'
+                                }`}
+                            >
+                                <BarChart3 size={20} strokeWidth={activeTab === 'report' ? 2.5 : 2} />
+                                <span className="text-xs font-bold">របាយការណ៍</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Action Modal */}
+                    {showActionModal && selectedEmp && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                            <div 
+                                className="absolute inset-0 bg-slate-900/40 backdrop-blur-[4px] animate-fade-in"
+                                onClick={closeActionModal}
+                            ></div>
+                            
+                            <div className="bg-white w-full max-w-sm rounded-[32px] shadow-2xl animate-zoom-in relative z-10 overflow-hidden">
+                                
+                                {/* Header */}
+                                <div className="bg-slate-50/80 px-6 py-5 flex justify-between items-start border-b border-slate-100 backdrop-blur-sm">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-14 h-14 rounded-full bg-gradient-brand flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-indigo-200">
+                                            {selectedEmp.khmer_name[0]}
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-lg text-slate-800 leading-tight">{selectedEmp.khmer_name}</h3>
+                                            <p className="text-xs text-slate-500 font-medium mt-1 bg-white inline-block px-2 py-0.5 rounded-md border border-slate-100">ជ្រើសរើសប្រតិបត្តិការ</p>
+                                        </div>
+                                    </div>
+                                    <button 
+                                        onClick={closeActionModal}
+                                        className="w-8 h-8 rounded-full bg-white text-slate-400 flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-colors shadow-sm border border-slate-100"
+                                    >
+                                        <X size={18} />
+                                    </button>
+                                </div>
+
+                                <div className="p-6 bg-white">
+                                    {!isPermissionMode ? (
+                                        <div className="grid grid-cols-2 gap-4">
+                                            {/* Button 1: Check In OR Check Out */}
+                                            <button 
+                                                onClick={isAlreadyCheckedIn ? () => {
+                                                    closeActionModal();
+                                                    initiateCheckOut(selectedEmp.id, selectedEmp.khmer_name);
+                                                } : handleCheckIn}
+                                                className={`group flex flex-col items-center justify-center gap-3 p-5 rounded-3xl shadow-xl active:scale-95 transition-all aspect-square relative overflow-hidden ${
+                                                    isAlreadyCheckedIn 
+                                                        ? "bg-red-500 text-white shadow-red-200 hover:bg-red-600" 
+                                                        : "bg-[#4F46E5] text-white shadow-indigo-200 hover:bg-indigo-700"
+                                                }`}
+                                            >
+                                                <div className="absolute top-0 left-0 w-full h-full bg-white opacity-0 group-hover:opacity-10 transition-opacity"></div>
+                                                <div className="bg-white/20 p-3.5 rounded-full backdrop-blur-sm">
+                                                    {isAlreadyCheckedIn ? <LogOut size={32} /> : <Clock size={32} />}
+                                                </div>
+                                                <span className="font-bold text-lg">{isAlreadyCheckedIn ? "ចាកចេញ" : "កត់ត្រាម៉ោង"}</span>
+                                            </button>
+
+                                            {/* Button 2: Permission */}
+                                            <button 
+                                                onClick={() => setIsPermissionMode(true)}
+                                                className="group flex flex-col items-center justify-center gap-3 bg-white text-orange-500 p-5 rounded-3xl border-2 border-orange-100 active:scale-95 transition-all hover:bg-orange-50 aspect-square shadow-sm"
+                                            >
+                                                <div className="bg-orange-50 p-3.5 rounded-full group-hover:scale-110 transition-transform">
+                                                    <FileText size={32} />
+                                                </div>
+                                                <span className="font-bold text-lg">សុំច្បាប់</span>
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-4 animate-fade-in">
+                                            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
+                                                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">មូលហេតុ</label>
+                                                <textarea 
+                                                    className="w-full bg-white border-0 rounded-xl p-3 text-slate-700 font-medium min-h-[120px] resize-none focus:ring-0 shadow-sm"
+                                                    placeholder="សូមសរសេរមូលហេតុនៅទីនេះ..."
+                                                    value={permissionReason}
+                                                    onChange={(e) => setPermissionReason(e.target.value)}
+                                                    autoFocus
+                                                ></textarea>
+                                            </div>
+                                            <div className="flex gap-3 pt-2">
+                                                <button 
+                                                    onClick={() => setIsPermissionMode(false)}
+                                                    className="flex-1 py-4 bg-white border border-slate-200 text-slate-600 font-bold rounded-2xl active:scale-95 transition-transform hover:bg-slate-50"
+                                                >
+                                                    ត្រឡប់ក្រោយ
+                                                </button>
+                                                <button 
+                                                    onClick={handlePermission}
+                                                    className="flex-1 py-4 bg-indigo-600 text-white font-bold rounded-2xl shadow-lg shadow-indigo-200 active:scale-95 transition-transform hover:bg-indigo-700"
+                                                >
+                                                    បញ្ជូនសំណើ
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Check Out Confirmation Modal */}
+                    {checkOutTarget && (
+                        <div className="fixed inset-0 z-[70] flex items-center justify-center p-5">
+                            <div 
+                                className="absolute inset-0 bg-slate-900/50 backdrop-blur-[4px] animate-fade-in"
+                                onClick={() => setCheckOutTarget(null)}
+                            ></div>
+                            <div className="bg-white w-full max-w-[320px] rounded-[32px] p-6 shadow-2xl relative z-10 animate-zoom-in text-center">
+                                
+                                <button 
+                                    onClick={() => setCheckOutTarget(null)}
+                                    className="absolute top-4 right-4 text-slate-300 hover:text-slate-500 bg-slate-50 p-1 rounded-full"
+                                >
+                                    <X size={18} />
+                                </button>
+
+                                <div className="w-16 h-16 rounded-full bg-red-50 text-red-500 flex items-center justify-center mx-auto mb-4 border-4 border-red-50">
+                                    <LogOut size={32} />
+                                </div>
+                                <h3 className="text-xl font-bold text-slate-800 mb-2">Check Out?</h3>
+                                <p className="text-slate-500 text-xs mb-6 px-4 leading-relaxed bg-slate-50 py-2 rounded-xl">
+                                    បញ្ជាក់ការចាកចេញសម្រាប់ <br />
+                                    <span className="font-bold text-slate-800 text-sm">"{checkOutTarget.name}"</span>
+                                </p>
+                                <div className="flex gap-3">
+                                    <button 
+                                        onClick={() => setCheckOutTarget(null)}
+                                        className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl text-sm active:scale-95 transition-transform"
+                                    >
+                                        បោះបង់
+                                    </button>
+                                    <button 
+                                        onClick={confirmCheckOut}
+                                        className="flex-1 py-3 bg-red-500 text-white font-bold rounded-xl text-sm shadow-lg shadow-red-200 active:scale-95 transition-transform"
+                                    >
+                                        យល់ព្រម
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Delete Confirmation Modal */}
+                    {deleteTarget && (
+                        <div className="fixed inset-0 z-[70] flex items-center justify-center p-5">
+                            <div 
+                                className="absolute inset-0 bg-slate-900/50 backdrop-blur-[4px] animate-fade-in"
+                                onClick={() => setDeleteTarget(null)}
+                            ></div>
+                            <div className="bg-white w-full max-w-[320px] rounded-[32px] p-6 shadow-2xl relative z-10 animate-zoom-in text-center">
+                                
+                                <button 
+                                    onClick={() => setDeleteTarget(null)}
+                                    className="absolute top-4 right-4 text-slate-300 hover:text-slate-500 bg-slate-50 p-1 rounded-full"
+                                >
+                                    <X size={18} />
+                                </button>
+
+                                <div className="w-16 h-16 rounded-full bg-red-50 text-red-500 flex items-center justify-center mx-auto mb-4 border-4 border-red-50">
+                                    <Trash2 size={32} />
+                                </div>
+                                <h3 className="text-xl font-bold text-slate-800 mb-2">លុបទិន្នន័យ?</h3>
+                                <p className="text-slate-500 text-xs mb-6 px-4 leading-relaxed bg-slate-50 py-2 rounded-xl">
+                                    តើអ្នកពិតជាចង់លុបវត្តមានរបស់ <br />
+                                    <span className="font-bold text-slate-800 text-sm">"{deleteTarget.name}"</span> មែនទេ?
+                                </p>
+                                <div className="flex gap-3">
+                                    <button 
+                                        onClick={() => setDeleteTarget(null)}
+                                        className="flex-1 py-3 bg-slate-100 text-slate-600 font-bold rounded-xl text-sm active:scale-95 transition-transform"
+                                    >
+                                        ទេ
+                                    </button>
+                                    <button 
+                                        onClick={confirmDelete}
+                                        className="flex-1 py-3 bg-red-500 text-white font-bold rounded-xl text-sm shadow-lg shadow-red-200 active:scale-95 transition-transform"
+                                    >
+                                        លុប
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
